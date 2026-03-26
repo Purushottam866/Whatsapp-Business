@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Login</title>
+
+<style>
+body{
+  font-family:Arial;
+  background:#f4f6f8;
+}
+.box{
+  width:350px;
+  margin:100px auto;
+  background:#fff;
+  padding:30px;
+  border-radius:8px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+}
+input{
+  width:100%;
+  padding:10px;
+  margin-top:10px;
+}
+button{
+  width:100%;
+  margin-top:15px;
+  padding:10px;
+  background:#25D366;
+  color:#fff;
+  border:none;
+  border-radius:5px;
+  cursor:pointer;
+}
+#msg{
+  margin-top:12px;
+  color:red;
+}
+</style>
+</head>
+
+<body>
+
+<div class="box">
+<h2>Login</h2>
+
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
+
+<button onclick="login()">Login</button>
+
+<p id="msg"></p>
+</div>
+
+<script>
+
+function login(){
+
+  const email=document.getElementById("email").value;
+  const password=document.getElementById("password").value;
+
+  fetch("http://localhost:8080/auth/login",{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      email:email,
+      password:password
+    })
+  })
+  .then(res=>res.json())
+  .then(data=>{
+
+    if(data.statusCode!==200){
+      document.getElementById("msg").innerText=data.message;
+      return;
+    }
+
+    // save JWT
+    localStorage.setItem("jwtToken",data.data);
+
+    // go to onboarding page
+    window.location.href="/whatsapp-onboarding.html";
+  })
+  .catch(()=>{
+    document.getElementById("msg").innerText="Server error";
+  });
+}
+
+</script>
+
+</body>
+</html>

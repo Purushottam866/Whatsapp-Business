@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Send WhatsApp Message (App Review)</title>
+
+<style>
+body {
+	font-family: Arial, sans-serif;
+	background: #f4f6f8;
+	margin: 0;
+	padding: 0;
+}
+
+.container {
+	max-width: 900px;
+	margin: 60px auto;
+	background: #ffffff;
+	padding: 40px;
+	border-radius: 8px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+h2 {
+	color: #075E54;
+}
+
+.token-info {
+	background: #e8f5e9;
+	border-left: 4px solid #25D366;
+	padding: 12px;
+	margin-bottom: 20px;
+	font-family: monospace;
+	font-size: 12px;
+	word-break: break-all;
+}
+
+label {
+	font-weight: bold;
+	margin-top: 15px;
+	display: block;
+}
+
+input, select {
+	width: 100%;
+	padding: 10px;
+	font-size: 14px;
+	margin-top: 5px;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+}
+
+.readonly-box {
+	background: #f1f3f4;
+	padding: 12px;
+	border-radius: 6px;
+	margin-top: 5px;
+	font-family: monospace;
+}
+
+button {
+	background: #25D366;
+	color: white;
+	border: none;
+	padding: 12px 24px;
+	margin-top: 25px;
+	font-size: 15px;
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+button:hover {
+	background: #1ebe5d;
+}
+
+pre {
+	background: #f1f3f4;
+	padding: 16px;
+	border-radius: 6px;
+	margin-top: 20px;
+	overflow-x: auto;
+}
+
+.back-link {
+	display: inline-block;
+	margin-top: 20px;
+	color: #075E54;
+	text-decoration: none;
+}
+
+.status {
+	margin-top: 10px;
+	padding: 10px;
+	border-radius: 4px;
+	display: none;
+}
+
+.status.success {
+	background: #d4edda;
+	color: #155724;
+	border: 1px solid #c3e6cb;
+	display: block;
+}
+
+.status.error {
+	background: #f8d7da;
+	color: #721c24;
+	border: 1px solid #f5c6cb;
+	display: block;
+}
+</style>
+</head>
+
+<body>
+
+	<div class="container">
+
+		<h2>Send WhatsApp Message (App Review Test)</h2>
+
+		<div class="token-info" id="tokenDisplay">
+			Loading token...
+		</div>
+
+		<p>This page demonstrates sending a WhatsApp message using Meta's
+			provided test WhatsApp Business number via the backend.</p>
+
+		<label>WhatsApp Business Sender</label>
+		<div class="readonly-box">
+			Phone Number ID (Meta Test Number): <b>354533394420568</b>
+		</div>
+
+		<label>Recipient WhatsApp Number</label> 
+		<input id="to" placeholder="91XXXXXXXXXX" value="918660408323" /> 
+		
+		<label>Template</label> 
+		<select id="template">
+			<option value="hello_world">hello_world (en_US)</option>
+			<option value="event_registration_confirmation">event_registration_confirmation</option>
+			<option value="care_welcome_image">care_welcome_image</option>
+		</select>
+
+		<button onclick="sendMessage()">Send WhatsApp Message</button>
+
+		<div id="status" class="status"></div>
+		<pre id="output">No message sent yet.</pre>
+		
+		<a href="/" class="back-link">← Back to Home</a>
+
+	</div>
+
+	<script>
+
+const PHONE_NUMBER_ID = "354533394420568";
+let jwtToken = null;
+
+// Get token from URL or localStorage
+function getToken() {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('token') || localStorage.getItem('jwt_token');
+}
+
+// Display token info
+function displayTokenInfo() {
+  const token = getToken();
+  if (token) {
+    document.getElementById('tokenDisplay').innerHTML = 
+      '✅ Authenticated with JWT: <span style="color:#075E54">' + 
+      token.substring(0, 30) + '...' + token.substring(token.length-10) + '</span>';
+    jwtToken = token;
+  } else {
+    document.getElementById('tokenDisplay').innerHTML = 
+      '❌ No JWT token found. Please <a href="/">go back</a> and save your token.';
+  }
+}
+
+function showStatus(message, type) {
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = message;
+  statusEl.className = 'status ' + type;
+  
+  // Auto hide after 5 seconds
+  setTimeout(() => {
+    statusEl.style.display = 'none';
+  }, 5000);
+}
+
+function sendMessage() {
+  if (!jwtToken) {
+    alert('No JWT token found. Please save your token first.');
+    return;
+  }
+
+  const to = document.getElementById("to").value;
+  if (!to) {
+    alert('Please enter a recipient number');
+    return;
+  }
+
+  const payload = {
+    wabaId: "1416031466984682",
+    templateName: document.getElementById("template").value,
+    language: "en_US",
+    to: to
+  };
+
+  const output = document.getElementById("output");
+  output.textContent = "Sending message...";
+  showStatus('Sending message...', 'success');
+
+  fetch("/api/whatsapp/messages/send", {
+    method: "POST",
+    headers: { 
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + jwtToken
+    },
+    body: JSON.stringify(payload)
+  })
+  .then(res => res.json())
+  .then(data => {
+    output.textContent = JSON.stringify(data, null, 2);
+    if (data.statusCode === 200) {
+      showStatus('✅ Message sent successfully!', 'success');
+    } else {
+      showStatus('❌ Error: ' + (data.message || 'Unknown error'), 'error');
+    }
+  })
+  .catch(err => {
+    output.textContent = "Error: " + err;
+    showStatus('❌ Error: ' + err.message, 'error');
+  });
+}
+
+// Initialize on page load
+displayTokenInfo();
+</script>
+
+</body>
+</html>

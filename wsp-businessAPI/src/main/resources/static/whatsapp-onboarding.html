@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Connect WhatsApp Business</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 60px auto;
+      background: #ffffff;
+      padding: 40px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    h2 {
+      color: #075E54;
+      margin-bottom: 10px;
+    }
+
+    p {
+      color: #444;
+      line-height: 1.6;
+    }
+
+    .token-info {
+      background: #e8f5e9;
+      border-left: 4px solid #25D366;
+      padding: 12px;
+      margin-bottom: 20px;
+      font-family: monospace;
+      font-size: 12px;
+      word-break: break-all;
+    }
+
+    button {
+      background: #25D366;
+      color: #fff;
+      border: none;
+      padding: 12px 24px;
+      font-size: 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 15px;
+    }
+
+    button:hover {
+      background: #1ebe5d;
+    }
+
+    h3 {
+      margin-top: 30px;
+      color: #333;
+    }
+
+    pre {
+      background: #f1f3f4;
+      padding: 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      overflow-x: auto;
+    }
+
+    .note {
+      margin-top: 25px;
+      font-size: 12px;
+      color: #666;
+      border-top: 1px solid #eee;
+      padding-top: 15px;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-top: 20px;
+      color: #075E54;
+      text-decoration: none;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h2>Connect WhatsApp Business</h2>
+
+  <div class="token-info" id="tokenDisplay">
+    Loading token...
+  </div>
+
+  <p>
+    Use the button below to connect your WhatsApp Business Account
+    using Meta's official Embedded Signup flow.
+  </p>
+
+  <button onclick="launchSignup()">Connect WhatsApp Business</button>
+
+  <h3>Onboarding Result</h3>
+  <pre id="output">No account connected yet.</pre>
+
+  <a href="/" class="back-link">← Back to Home</a>
+
+  <div class="note">
+    Note: This demo uses Meta's official Embedded Signup flow.
+    Messaging features are enabled after Meta approval.
+  </div>
+
+</div>
+
+<script>
+/* ===== META CONFIG ===== */
+const APP_ID = "421449853704517";
+const CONFIG_ID = "2347003389108704";
+/* ====================== */
+
+let authCode = null;
+let signupData = null;
+let jwtToken = null;
+
+// Get token from URL or localStorage
+function getToken() {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('token') || localStorage.getItem('jwt_token');
+}
+
+// Display token info
+function displayTokenInfo() {
+  const token = getToken();
+  if (token) {
+    document.getElementById('tokenDisplay').innerHTML = 
+      '✅ Authenticated with JWT: <span style="color:#075E54">' + 
+      token.substring(0, 30) + '...' + token.substring(token.length-10) + '</span>';
+    jwtToken = token;
+  } else {
+    document.getElementById('tokenDisplay').innerHTML = 
+      '❌ No JWT token found. Please <a href="/">go back</a> and save your token.';
+  }
+}
+
+function printResult(title, obj) {
+  const out = document.getElementById("output");
+  out.textContent += title + "\n";
+  out.textContent += JSON.stringify(obj, null, 2) + "\n\n";
+}
+
+window.fbAsyncInit = function () {
+  FB.init({
+    appId: APP_ID,
+    version: "v25.0",
+    xfbml: false
+  });
+};
+
+(function(d,s,id){
+  if(d.getElementById(id)) return;
+  let js=d.createElement(s);
+  js.id=id;
+  js.src="https://connect.facebook.net/en_US/sdk.js";
+  d.head.appendChild(js);
+})(document,'script','facebook-jssdk');
+
+window.addEventListener("message", (event) => {
+  if (!event.origin.endsWith("facebook.com")) return;
+
+  try {
+    const data = JSON.parse(event.data);
+    if (data.type === "WA_EMBEDDED_SIGNUP") {
+
+      if (data.authorization_code) {
+        authCode = data.authorization_code;
+      }
+
+      if (data.data) {
+        signupData = data.data;
+        printResult("WhatsApp Business Connected:", {
+          waba_id: signupData.waba_id,
+          phone_number_id: signupData.phone_number_id,
+          business_id: signupData.business_id
+        });
+      }
+
+      trySendToBackend();
+    }
+  } catch {}
+});
+
+function loginCallback(response) {
+  if (response.authResponse?.code) {
+    authCode = response.authResponse.code;
+    trySendToBackend();
+  }
+}
+
+function launchSignup() {
+  if (!jwtToken) {
+    alert('No JWT token found. Please save your token first.');
+    return;
+  }
+  
+  FB.login(loginCallback, {
+    config_id: CONFIG_ID,
+    response_type: "code",
+    override_default_response_type: true,
+    extras: { setup: {} }
+  });
+}
+
+function trySendToBackend() {
+  if (!authCode || !signupData || !jwtToken) return;
+
+  fetch(`/api/whatsapp/onboarding/embedded-complete`, {
+    method: "POST",
+    headers: { 
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + jwtToken
+    },
+    body: JSON.stringify({
+      authorizationCode: authCode,
+      wabaId: signupData.waba_id,
+      phoneNumberId: signupData.phone_number_id,
+      businessId: signupData.business_id
+    })
+  })
+  .then(r => r.json())
+  .then(d => {
+    console.log("Backend response", d);
+    printResult("Backend Response:", d);
+    
+    if (d.statusCode === 200) {
+      alert('WhatsApp account connected successfully!');
+    } else {
+      alert('Error: ' + (d.message || 'Unknown error'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Error connecting to backend: ' + error.message);
+  });
+}
+
+// Initialize on page load
+displayTokenInfo();
+</script>
+
+</body>
+</html>
