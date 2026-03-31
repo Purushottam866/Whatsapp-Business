@@ -481,6 +481,79 @@ public class MetaApiClient {
             }
         }
     }
+    
+    
+    /**
+     * Send regular text message (non-template)
+     * This is for chat replies, not for template messages
+     */
+    public Map<String, Object> sendTextMessage(
+            String phoneNumberId,
+            String accessToken,
+            String to,
+            String text) {
+        
+        String url = GRAPH_API_BASE + "/" + API_VERSION + "/" + phoneNumberId + "/messages";
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("messaging_product", "whatsapp");
+        payload.put("to", to);
+        payload.put("type", "text");
+        
+        Map<String, Object> textObj = new HashMap<>();
+        textObj.put("body", text);
+        payload.put("text", textObj);
+        
+        log.info("📤 Sending text message to: {}", to);
+        
+        try {
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                    url, new HttpEntity<>(payload, headers), Map.class);
+            
+            Map<String, Object> responseBody = response.getBody();
+            log.info("✅ Text message sent successfully. Response: {}", responseBody);
+            
+            return responseBody;
+            
+        } catch (HttpClientErrorException ex) {
+            String errorBody = ex.getResponseBodyAsString();
+            log.error("❌ Text message failed: {}", errorBody);
+            
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", errorBody);
+            errorResponse.put("statusCode", ex.getStatusCode().value());
+            return errorResponse;
+        }
+    }
+    
+    
+//    /**
+//     * Get media info from Meta
+//     */
+//    public Map<String, Object> getMediaInfo(String mediaId, String token) {
+//        String url = GRAPH_API_BASE + "/" + API_VERSION + "/" + mediaId;
+//        
+//        HttpHeaders headers = new HttpHeaders();
+//        headers.setBearerAuth(token);
+//        
+//        HttpEntity<Void> request = new HttpEntity<>(headers);
+//        
+//        try {
+//            ResponseEntity<Map> response = restTemplate.exchange(
+//                url, HttpMethod.GET, request, Map.class);
+//            return response.getBody();
+//        } catch (HttpClientErrorException ex) {
+//            log.error("Failed to get media info: {}", ex.getResponseBodyAsString());
+//            Map<String, Object> error = new HashMap<>();
+//            error.put("error", ex.getMessage());
+//            return error;
+//        }
+//    }
+    
 
     public JsonNode fetchTemplates(String wabaId, String accessToken) {
         ObjectMapper mapper = new ObjectMapper();

@@ -47,6 +47,9 @@ public class WhatsAppMessage {
 
     @Column(name = "phone_number_id", nullable = false)
     private String phoneNumberId;
+    
+    @Column(name = "contact_name", length = 100)
+    private String contactName;
 
     @Column(name = "phone_number", nullable = false, length = 20)
     private String phoneNumber;

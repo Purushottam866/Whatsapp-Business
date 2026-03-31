@@ -35,18 +35,26 @@ public class FileParserService {
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     private static final int MAX_NUMBERS_PER_FILE = 10000; // Safety limit
     
-    // All possible column headers (case insensitive)
+    // Phone column keywords (more specific patterns)
     private static final Set<String> PHONE_COLUMN_KEYWORDS = new HashSet<>(Arrays.asList(
-        "contact", "contacts",
         "phone", "phones",
         "mobile", "mobiles",
-        "number", "numbers",
-        "phone number", "phone numbers",
-        "mobile number", "mobile numbers",
-        "contact number", "contact numbers",
-        "whatsapp number", "whatsapp numbers",
         "cell", "cells",
-        "telephone", "telephones"
+        "telephone", "telephones",
+        "whatsapp",
+        "contact no", "contact number", "contact numbers",
+        "phone no", "phone num", "phone number", "phone numbers",
+        "mobile no", "mobile num", "mobile number", "mobile numbers",
+        "mob", "mob no", "mob number"
+    ));
+    
+    // Exclude these columns - they contain names, not phone numbers
+    private static final Set<String> EXCLUDED_COLUMNS = new HashSet<>(Arrays.asList(
+        "contact person", "contact name", "name", "full name", 
+        "first name", "last name", "customer name", "client name",
+        "person", "representative", "contact_person", "contactperson",
+        "contact person name", "person name", "attendee name",
+        "participant name", "delegate name", "sponsor name"
     ));
 
     /**
@@ -151,7 +159,7 @@ public class FileParserService {
                 throw new ValidationException("NO_HEADER_ROW", "Could not find a header row");
             }
             
-            // Find ALL phone-related columns
+            // Find ALL phone-related columns (excluding name columns)
             List<Integer> phoneColumns = findAllPhoneColumns(headerRow);
             
             if (phoneColumns.isEmpty()) {
@@ -307,7 +315,7 @@ public class FileParserService {
     }
     
     /**
-     * Find ALL column indices that contain phone number headers
+     * Find ALL column indices that contain phone number headers (excluding name columns)
      */
     private List<Integer> findAllPhoneColumns(Row headerRow) {
         List<Integer> phoneColumns = new ArrayList<>();
@@ -315,11 +323,22 @@ public class FileParserService {
         for (Cell cell : headerRow) {
             String headerValue = getCellValueAsString(cell).toLowerCase().trim();
             
+            // Skip if this is an excluded column (contains name-related keywords)
+            boolean isExcluded = EXCLUDED_COLUMNS.stream()
+                .anyMatch(excluded -> headerValue.contains(excluded));
+            
+            if (isExcluded) {
+                log.debug("Skipping excluded column: '{}'", headerValue);
+                continue;
+            }
+            
+            // Check if it's a phone column
             boolean isPhoneColumn = PHONE_COLUMN_KEYWORDS.stream()
                 .anyMatch(keyword -> headerValue.contains(keyword.toLowerCase()));
             
             if (isPhoneColumn) {
                 phoneColumns.add(cell.getColumnIndex());
+                log.debug("Found phone column: '{}' at index {}", headerValue, cell.getColumnIndex());
             }
         }
         
@@ -329,13 +348,23 @@ public class FileParserService {
     }
     
     /**
-     * Find ALL phone column indices in CSV header array
+     * Find ALL phone column indices in CSV header array (excluding name columns)
      */
     private List<Integer> findAllPhoneColumnsInArray(String[] headers) {
         List<Integer> phoneColumns = new ArrayList<>();
         
         for (int i = 0; i < headers.length; i++) {
             String header = headers[i].toLowerCase().trim();
+            
+            // Skip if this is an excluded column
+            boolean isExcluded = EXCLUDED_COLUMNS.stream()
+                .anyMatch(excluded -> header.contains(excluded));
+            
+            if (isExcluded) {
+                log.debug("Skipping excluded column: '{}'", header);
+                continue;
+            }
+            
             boolean isPhoneColumn = PHONE_COLUMN_KEYWORDS.stream()
                 .anyMatch(keyword -> header.contains(keyword.toLowerCase()));
             
@@ -397,7 +426,7 @@ public class FileParserService {
     
     /**
      * Clean and validate phone numbers
-     * UPDATED: Now removes ALL non-digit characters (parentheses, hyphens, spaces, etc.)
+     * Removes ALL non-digit characters (parentheses, hyphens, spaces, etc.)
      */
     private List<String> validateAndCleanNumbers(List<String> rawNumbers) {
         List<String> validated = new ArrayList<>();
@@ -407,7 +436,6 @@ public class FileParserService {
             if (raw == null || raw.isBlank()) continue;
             
             // Step 1: Remove ALL non-digit characters (keeps only 0-9)
-            // This handles: spaces, parentheses, hyphens, plus signs, dots, etc.
             String cleaned = raw.replaceAll("[^0-9]", "");
             
             // Log the transformation for debugging

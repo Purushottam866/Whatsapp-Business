@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.whatsApp.wsp_businessAPI.entity.WhatsAppTemplate;
@@ -34,4 +36,13 @@ public interface WhatsAppTemplateRepository extends JpaRepository<WhatsAppTempla
     );
 
     List<WhatsAppTemplate> findByStatus(WhatsAppTemplate.Status status);
+    
+ 
+
+    // Add index hint for faster queries
+    @Query("SELECT t FROM WhatsAppTemplate t WHERE t.tenantId = :tenantId AND t.wabaId = :wabaId ORDER BY t.createdAt DESC")
+    List<WhatsAppTemplate> findByTenantIdAndWabaIdOrderByCreatedAtDesc(
+        @Param("tenantId") Long tenantId, 
+        @Param("wabaId") String wabaId);
+    
 }
